@@ -166,13 +166,3 @@ Other folders: `src/panels/` (sidebar panels), `src/assistant/` (AI tools and ch
 | Tokens signed locally (`npm run token`) | The customer's identity provider |
 | Mocked enterprise systems | The real systems |
 | Local model through Ollama | The customer's private Azure OpenAI |
-
-## AI tools used
-
-Built with **Claude Code** (Anthropic) in VS Code. I used it to:
-
-- discuss the brief and the architecture, and challenge each decision;
-- draft the design document and the diagram;
-- write this service step by step from the agreed design, and run the tests and manual checks.
-
-I reviewed the design and the code, and can explain or change any part of it.
