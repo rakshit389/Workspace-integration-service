@@ -1,0 +1,29 @@
+{
+  "name": "workspace-integration-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Integration service that feeds the sidebar of the 3D sales workspace (CloudWorx assessment, Part B).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "token": "tsx scripts/token.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "start:prod": "node dist/src/server.js"
+  },
+  "dependencies": {
+    "fastify": "^5.12.7",
+    "jose": "^6.2.14"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

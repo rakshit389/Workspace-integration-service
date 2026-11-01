@@ -1,0 +1,48 @@
+{
+  "models": [
+    { "modelId": "R5-v2", "lod": { "low": "models/r5_7b10_low.glb", "medium": "models/r5_7b10_med.glb", "high": "models/r5_7b10_high.glb" } },
+    { "modelId": "R6-v3", "lod": { "low": "models/r6_c3d2_low.glb", "medium": "models/r6_c3d2_med.glb", "high": "models/r6_c3d2_high.glb" } },
+    { "modelId": "R7-v3", "lod": { "low": "models/r7_a91f_low.glb", "medium": "models/r7_a91f_med.glb", "high": "models/r7_a91f_high.glb" } },
+    { "modelId": "R8-v2", "lod": { "low": "models/r8_c42d_low.glb", "medium": "models/r8_c42d_med.glb", "high": "models/r8_c42d_high.glb" } },
+    { "modelId": "R9-v1", "lod": { "low": "models/r9_e5a0_low.glb", "medium": "models/r9_e5a0_med.glb", "high": "models/r9_e5a0_high.glb" } },
+    { "modelId": "CAB-800-v1", "lod": { "low": "models/cab800_19fe_low.glb", "medium": "models/cab800_19fe_med.glb", "high": "models/cab800_19fe_high.glb" } },
+    { "modelId": "CAB-1200-v1", "lod": { "low": "models/cab1200_2b77_low.glb", "medium": "models/cab1200_2b77_med.glb", "high": "models/cab1200_2b77_high.glb" } },
+    { "modelId": "PNL-S-v1", "lod": { "low": "models/pnls_8c31_low.glb", "medium": "models/pnls_8c31_med.glb", "high": "models/pnls_8c31_high.glb" } }
+  ],
+  "variants": [
+    { "variantCode": "R5-IP54", "kind": "drive", "modelId": "R5-v2", "frame": "R5", "ratedKw": 45, "ipRating": "IP54", "description": "Drive R5, 45 kW, IP54", "dimensionsMm": { "w": 250, "h": 560, "d": 330 } },
+    { "variantCode": "R6-IP54", "kind": "drive", "modelId": "R6-v3", "frame": "R6", "ratedKw": 62, "ipRating": "IP54", "description": "Drive R6, 62 kW, IP54", "dimensionsMm": { "w": 280, "h": 620, "d": 350 } },
+    { "variantCode": "R7-IP54", "kind": "drive", "modelId": "R7-v3", "frame": "R7", "ratedKw": 85, "ipRating": "IP54", "description": "Drive R7, 85 kW, IP54", "dimensionsMm": { "w": 300, "h": 700, "d": 380 } },
+    { "variantCode": "R8-IP54", "kind": "drive", "modelId": "R8-v2", "frame": "R8", "ratedKw": 125, "ipRating": "IP54", "description": "Drive R8, 125 kW, IP54", "dimensionsMm": { "w": 340, "h": 820, "d": 420 } },
+    { "variantCode": "R9-IP54", "kind": "drive", "modelId": "R9-v1", "frame": "R9", "ratedKw": 180, "ipRating": "IP54", "description": "Drive R9, 180 kW, IP54", "dimensionsMm": { "w": 380, "h": 960, "d": 460 } },
+    { "variantCode": "R5-IP21", "kind": "drive", "modelId": "R5-v2", "frame": "R5", "ratedKw": 45, "ipRating": "IP21", "description": "Drive R5, 45 kW, IP21", "dimensionsMm": { "w": 250, "h": 560, "d": 330 } },
+    { "variantCode": "R6-IP21", "kind": "drive", "modelId": "R6-v3", "frame": "R6", "ratedKw": 62, "ipRating": "IP21", "description": "Drive R6, 62 kW, IP21", "dimensionsMm": { "w": 280, "h": 620, "d": 350 } },
+    { "variantCode": "R7-IP21", "kind": "drive", "modelId": "R7-v3", "frame": "R7", "ratedKw": 85, "ipRating": "IP21", "description": "Drive R7, 85 kW, IP21", "dimensionsMm": { "w": 300, "h": 700, "d": 380 } },
+    { "variantCode": "R8-IP21", "kind": "drive", "modelId": "R8-v2", "frame": "R8", "ratedKw": 125, "ipRating": "IP21", "description": "Drive R8, 125 kW, IP21", "dimensionsMm": { "w": 340, "h": 820, "d": 420 } },
+    { "variantCode": "R9-IP21", "kind": "drive", "modelId": "R9-v1", "frame": "R9", "ratedKw": 180, "ipRating": "IP21", "description": "Drive R9, 180 kW, IP21", "dimensionsMm": { "w": 380, "h": 960, "d": 460 } },
+    { "variantCode": "CAB-800", "kind": "cabinet", "modelId": "CAB-800-v1", "ipRating": "IP54", "description": "Cabinet, 800 mm wide", "dimensionsMm": { "w": 800, "h": 2000, "d": 600 } },
+    { "variantCode": "CAB-1200", "kind": "cabinet", "modelId": "CAB-1200-v1", "ipRating": "IP54", "description": "Cabinet, 1200 mm wide", "dimensionsMm": { "w": 1200, "h": 2000, "d": 600 } },
+    { "variantCode": "PNL-S", "kind": "panel", "modelId": "PNL-S-v1", "ipRating": "IP54", "description": "Control panel, small", "dimensionsMm": { "w": 600, "h": 800, "d": 250 } }
+  ],
+  "pricing": {
+    "baseEur": {
+      "R5-IP54": 4800, "R6-IP54": 6100, "R7-IP54": 8200, "R8-IP54": 10500, "R9-IP54": 14300,
+      "R5-IP21": 4400, "R6-IP21": 5600, "R7-IP21": 7550, "R8-IP21": 9650, "R9-IP21": 13150,
+      "CAB-800": 1700, "CAB-1200": 2300, "PNL-S": 2900
+    },
+    "leadTimeDays": {
+      "R5-IP54": 21, "R6-IP54": 28, "R7-IP54": 42, "R8-IP54": 56, "R9-IP54": 70,
+      "R5-IP21": 21, "R6-IP21": 28, "R7-IP21": 42, "R8-IP21": 56, "R9-IP21": 70,
+      "CAB-800": 35, "CAB-1200": 35, "PNL-S": 14
+    },
+    "countries": {
+      "DE": { "currency": "EUR", "rate": 1.0 },
+      "FR": { "currency": "EUR", "rate": 1.0 },
+      "IT": { "currency": "EUR", "rate": 1.0 },
+      "US": { "currency": "USD", "rate": 1.08 },
+      "GB": { "currency": "GBP", "rate": 0.86 },
+      "IN": { "currency": "INR", "rate": 90.0 }
+    },
+    "customerGroups": { "standard": 1.0, "utility": 0.92, "oem": 0.88 }
+  }
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "projectId": "P-24117",
+    "name": "Water plant pump room",
+    "customerGroup": "utility",
+    "items": [
+      {
+        "itemId": "3f6c1d2e-0a41-4b8e-9d1e-2b7c1f0a9e03",
+        "tag": "DRV-03",
+        "kind": "drive",
+        "variantCode": "R7-IP54",
+        "modelRef": "R7-v3",
+        "sizingInputs": { "motorKw": 75, "voltage": 400, "ipRating": "IP54" },
+        "placement": { "x": 4, "y": 1 },
+        "revision": 1
+      },
+      {
+        "itemId": "8a2d4f61-5c0b-4e3a-b7f2-6d9e1c4a8b04",
+        "tag": "DRV-04",
+        "kind": "drive",
+        "variantCode": "R6-IP54",
+        "modelRef": "R6-v3",
+        "sizingInputs": { "motorKw": 55, "voltage": 400, "ipRating": "IP54" },
+        "placement": { "x": 7, "y": 1 },
+        "revision": 1
+      },
+      {
+        "itemId": "c41e9b7a-2f3d-4d8c-a0e5-7b1f6c2d9a01",
+        "tag": "CAB-01",
+        "kind": "cabinet",
+        "variantCode": "CAB-800",
+        "modelRef": "CAB-800-v1",
+        "placement": { "x": 1, "y": 1 },
+        "revision": 1
+      },
+      {
+        "itemId": "e9b3a1c5-7d2f-4a6e-8c0b-3f5d1e7a2c02",
+        "tag": "CAB-02",
+        "kind": "cabinet",
+        "variantCode": "CAB-800",
+        "modelRef": "CAB-800-v1",
+        "placement": { "x": 9, "y": 3 },
+        "revision": 1
+      },
+      {
+        "itemId": "5d7f2b9e-1a4c-4f0d-9e3b-8c6a2d1f7e05",
+        "tag": "PNL-S1",
+        "kind": "panel",
+        "variantCode": "PNL-S",
+        "modelRef": "PNL-S-v1",
+        "placement": { "x": 2, "y": 4 },
+        "revision": 1
+      }
+    ]
+  }
+]

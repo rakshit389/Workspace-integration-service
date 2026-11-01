@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.env
+*.log
+.DS_Store
+
+# The assessment brief is confidential to the hiring process; never commit it.
+*.pdf
