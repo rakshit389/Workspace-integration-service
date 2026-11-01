@@ -31,5 +31,7 @@ export interface Project {
   projectId: string;
   name: string;
   customerGroup: string;
+  /** User IDs (token `sub`) allowed to open this project. Administrators can open every project. */
+  memberIds: string[];
   items: Item[];
 }

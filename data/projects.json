@@ -3,6 +3,7 @@
     "projectId": "P-24117",
     "name": "Water plant pump room",
     "customerGroup": "utility",
+    "memberIds": ["user-sales_engineer", "user-channel_partner"],
     "items": [
       {
         "itemId": "3f6c1d2e-0a41-4b8e-9d1e-2b7c1f0a9e03",
@@ -49,6 +50,24 @@
         "variantCode": "PNL-S",
         "modelRef": "PNL-S-v1",
         "placement": { "x": 2, "y": 4 },
+        "revision": 1
+      }
+    ]
+  },
+  {
+    "projectId": "P-30002",
+    "name": "Brewery packaging line",
+    "customerGroup": "oem",
+    "memberIds": ["user-other-engineer"],
+    "items": [
+      {
+        "itemId": "a7c2e9f4-3b1d-4e8a-9f6c-0d2b5e8a1c07",
+        "tag": "DRV-01",
+        "kind": "drive",
+        "variantCode": "R5-IP21",
+        "modelRef": "R5-v2",
+        "sizingInputs": { "motorKw": 37, "voltage": 400, "ipRating": "IP21" },
+        "placement": { "x": 3, "y": 2 },
         "revision": 1
       }
     ]

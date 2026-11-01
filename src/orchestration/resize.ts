@@ -1,4 +1,6 @@
 import type { Adapters } from '../adapters/index.js';
+import type { ModelAssets } from '../adapters/catalogue.js';
+import type { SizingResult } from '../adapters/sizing.js';
 import { policy, requireResize } from '../auth/policy.js';
 import type { Item, Project, SizingInputs, User } from '../domain/types.js';
 import { HttpError } from '../errors.js';
@@ -11,6 +13,110 @@ export interface ResizeBody {
   baseRevision?: number;
 }
 
+export interface BomChangeLine {
+  variantCode: string;
+  quantityBefore: number;
+  quantityAfter: number;
+}
+
+export type PriceDelta = { status: 'ok'; amount: number; currency: string } | { status: 'unavailable' };
+
+/** Everything a re-size would change, worked out without writing anything. */
+export interface ResizePlan {
+  projectId: string;
+  itemId: string;
+  tag: string;
+  baseRevision: number;
+  previousVariant: string;
+  inputs: SizingInputs;
+  sizing: SizingResult;
+  changed: boolean;
+  variantCode: string;
+  model?: ModelAssets;
+  bomChange: { lines: BomChangeLine[]; priceDelta?: PriceDelta };
+}
+
+export interface PlanRequest {
+  user: User;
+  project: Project;
+  item: Item;
+  motorKw: number;
+  voltage?: number;
+  adapters: Adapters;
+  budgetMs: number;
+}
+
+/** Runs sizing for the new inputs and works out the variant, 3D model and BOM change. Writes nothing. */
+export async function planResize(request: PlanRequest): Promise<ResizePlan> {
+  const { user, project, item, adapters, budgetMs } = request;
+  requireResize(user);
+  if (item.kind !== 'drive' || !item.sizingInputs) {
+    throw new HttpError(422, 'not_resizable', `${item.tag} is a ${item.kind}; only drives can be re-sized`);
+  }
+
+  const inputs: SizingInputs = { ...item.sizingInputs, motorKw: request.motorKw, voltage: request.voltage ?? item.sizingInputs.voltage };
+  const sizing = await adapters.sizing.size(inputs, user, budgetMs);
+  // A re-size needs a fresh answer for these inputs; a stale or missing one is not good enough to change the BOM.
+  if (sizing.status !== 'ok') {
+    throw new HttpError(503, 'sizing_unavailable', `Re-size not applied: ${sizing.reason}`, { sizingStatus: sizing.status });
+  }
+
+  const base = {
+    projectId: project.projectId,
+    itemId: item.itemId,
+    tag: item.tag,
+    baseRevision: item.revision,
+    previousVariant: item.variantCode,
+    inputs,
+    sizing: sizing.value,
+  };
+  if (sizing.value.variantCode === item.variantCode) {
+    return { ...base, changed: false, variantCode: item.variantCode, bomChange: { lines: [] } };
+  }
+
+  const catalogueEntry = valueOf(await adapters.catalogue.getVariant(sizing.value.variantCode, budgetMs));
+  if (!catalogueEntry) {
+    throw new HttpError(503, 'catalogue_unavailable', `Re-size not applied: no catalogue data for ${sizing.value.variantCode}`);
+  }
+
+  const after = project.items.map((candidate) => (candidate.itemId === item.itemId ? { ...candidate, variantCode: sizing.value.variantCode } : candidate));
+  return {
+    ...base,
+    changed: true,
+    variantCode: sizing.value.variantCode,
+    model: catalogueEntry.model,
+    bomChange: {
+      lines: diffQuantities(project.items, after),
+      priceDelta: await priceDelta(user, project, item.variantCode, sizing.value.variantCode, adapters, budgetMs),
+    },
+  };
+}
+
+/** Writes a plan, but only if the item is still at the revision the plan was made from. */
+export function applyResize(repo: InMemoryProjectRepository, plan: ResizePlan): Item {
+  return repo.updateItem(
+    plan.projectId,
+    plan.itemId,
+    plan.baseRevision,
+    plan.changed ? { variantCode: plan.variantCode, modelRef: plan.model!.modelId, sizingInputs: plan.inputs } : { sizingInputs: plan.inputs },
+  );
+}
+
+export function resizeResponse(plan: ResizePlan, updated: Item) {
+  return {
+    itemId: updated.itemId,
+    tag: updated.tag,
+    changed: plan.changed,
+    previousVariant: plan.previousVariant,
+    variantCode: updated.variantCode,
+    modelRef: updated.modelRef,
+    model: plan.model,
+    revision: updated.revision,
+    sizing: { frame: plan.sizing.frame, loadPct: plan.sizing.loadPct, inputs: updated.sizingInputs },
+    bomChange: plan.bomChange,
+  };
+}
+
 export interface ResizeRequest {
   user: User;
   projectId: string;
@@ -21,95 +127,31 @@ export interface ResizeRequest {
   budgetMs: number;
 }
 
-interface BomChangeLine {
-  variantCode: string;
-  quantityBefore: number;
-  quantityAfter: number;
-}
-
-/**
- * Re-size flow: run sizing with the new inputs; if the recommended variant differs, update the item's
- * variant and 3D model reference in one revision-checked write and return how the BOM changed.
- */
+/** The direct re-size used by the sizing panel: plan, then apply in one request. */
 export async function resizeItem(request: ResizeRequest) {
-  const { user, adapters, repo, budgetMs } = request;
+  const { user, repo, body } = request;
   requireResize(user);
-
   const { project, item } = repo.getItem(request.projectId, request.itemId);
-  if (item.kind !== 'drive' || !item.sizingInputs) {
-    throw new HttpError(422, 'not_resizable', `${item.tag} is a ${item.kind}; only drives can be re-sized`);
-  }
-  if (request.body.baseRevision !== undefined && request.body.baseRevision !== item.revision) {
+  if (body.baseRevision !== undefined && body.baseRevision !== item.revision) {
     throw new HttpError(409, 'revision_conflict', 'The item has changed since you loaded it', {
-      expectedRevision: request.body.baseRevision,
+      expectedRevision: body.baseRevision,
       currentRevision: item.revision,
     });
   }
+  const plan = await planResize({ user, project, item, motorKw: body.motorKw, voltage: body.voltage, adapters: request.adapters, budgetMs: request.budgetMs });
+  return resizeResponse(plan, applyResize(repo, plan));
+}
 
-  const inputs: SizingInputs = { ...item.sizingInputs, motorKw: request.body.motorKw, voltage: request.body.voltage ?? item.sizingInputs.voltage };
-  const sizing = await adapters.sizing.size(inputs, user, budgetMs);
-  // A re-size needs a fresh answer for these inputs; a stale or missing one is not good enough to change the BOM.
-  if (sizing.status !== 'ok') {
-    throw new HttpError(503, 'sizing_unavailable', `Re-size not applied: ${sizing.reason}`, { sizingStatus: sizing.status });
-  }
-  const result = sizing.value;
-
-  if (result.variantCode === item.variantCode) {
-    const updated = repo.updateItem(project.projectId, item.itemId, item.revision, { sizingInputs: inputs });
-    return response(updated, item, result, { changed: false, lines: [] });
-  }
-
-  const variant = await adapters.catalogue.getVariant(result.variantCode, budgetMs);
-  const catalogueEntry = valueOf(variant);
-  if (!catalogueEntry) {
-    throw new HttpError(503, 'catalogue_unavailable', `Re-size not applied: no catalogue data for ${result.variantCode}`);
-  }
-
-  const before = quantities(project.items);
-  const updated = repo.updateItem(project.projectId, item.itemId, item.revision, {
-    variantCode: result.variantCode,
-    modelRef: catalogueEntry.model.modelId,
-    sizingInputs: inputs,
-  });
-  const after = quantities(repo.getProject(project.projectId).items);
-
-  const lines: BomChangeLine[] = [...new Set([...before.keys(), ...after.keys()])]
-    .map((variantCode) => ({ variantCode, quantityBefore: before.get(variantCode) ?? 0, quantityAfter: after.get(variantCode) ?? 0 }))
+function diffQuantities(before: Item[], after: Item[]): BomChangeLine[] {
+  const count = (items: Item[]) => new Map([...groupByVariant(items)].map(([code, group]) => [code, group.length]));
+  const a = count(before);
+  const b = count(after);
+  return [...new Set([...a.keys(), ...b.keys()])]
+    .map((variantCode) => ({ variantCode, quantityBefore: a.get(variantCode) ?? 0, quantityAfter: b.get(variantCode) ?? 0 }))
     .filter((line) => line.quantityBefore !== line.quantityAfter);
-
-  return response(updated, item, result, {
-    changed: true,
-    lines,
-    model: catalogueEntry.model,
-    priceDelta: await priceDelta(user, project, item.variantCode, result.variantCode, adapters, budgetMs),
-  });
 }
 
-function response(
-  updated: Item,
-  previous: Item,
-  sizing: { frame: string; variantCode: string; loadPct: number },
-  change: { changed: boolean; lines: BomChangeLine[]; model?: unknown; priceDelta?: unknown },
-) {
-  return {
-    itemId: updated.itemId,
-    tag: updated.tag,
-    changed: change.changed,
-    previousVariant: previous.variantCode,
-    variantCode: updated.variantCode,
-    modelRef: updated.modelRef,
-    model: change.model,
-    revision: updated.revision,
-    sizing: { frame: sizing.frame, loadPct: sizing.loadPct, inputs: updated.sizingInputs },
-    bomChange: { lines: change.lines, priceDelta: change.priceDelta },
-  };
-}
-
-function quantities(items: Item[]): Map<string, number> {
-  return new Map([...groupByVariant(items)].map(([code, group]) => [code, group.length]));
-}
-
-async function priceDelta(user: User, project: Project, fromVariant: string, toVariant: string, adapters: Adapters, budgetMs: number) {
+async function priceDelta(user: User, project: Project, fromVariant: string, toVariant: string, adapters: Adapters, budgetMs: number): Promise<PriceDelta | undefined> {
   if (!policy.canViewPrices(user)) return undefined;
   const quote = (variantCode: string) =>
     adapters.pricing.getQuote({ variantCode, country: user.country, customerGroup: project.customerGroup }, budgetMs).then(valueOf);

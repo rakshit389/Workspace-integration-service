@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { Config } from '../config.js';
 import { TtlCache } from '../resilience/cache.js';
 import { RateLimiter } from '../resilience/rateLimiter.js';
@@ -5,15 +6,18 @@ import { ResilientFetcher, type Outcome } from '../resilience/resilientFetcher.j
 import { withRetry } from '../resilience/retry.js';
 import { requestJson } from './http.js';
 
-export interface Quote {
-  variantCode: string;
-  country: string;
-  customerGroup: string;
-  unitPrice: number;
-  currency: string;
-  leadTimeDays: number;
-  validUntil: string;
-}
+/** The ERP's quote contract. A response that does not match is rejected in `requestJson`. */
+const quoteSchema = z.object({
+  variantCode: z.string(),
+  country: z.string().length(2),
+  customerGroup: z.string(),
+  unitPrice: z.number().nonnegative(),
+  currency: z.string().length(3),
+  leadTimeDays: z.number().int().nonnegative(),
+  validUntil: z.string().datetime(),
+});
+
+export type Quote = z.infer<typeof quoteSchema>;
 
 export interface QuoteRequest {
   variantCode: string;
@@ -55,7 +59,7 @@ export class PricingAdapter {
     const query = new URLSearchParams({ variant: request.variantCode, country: request.country, customerGroup: request.customerGroup });
     return withRetry(async () => {
       await this.limiter.acquire(this.config.maxQueueWaitMs);
-      return requestJson<Quote>('Pricing', `${this.config.baseUrl}/prices?${query}`, {
+      return requestJson('Pricing', `${this.config.baseUrl}/prices?${query}`, quoteSchema, {
         headers: { 'x-api-key': this.config.apiKey },
         timeoutMs: this.config.timeoutMs,
       });

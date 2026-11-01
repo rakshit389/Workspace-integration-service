@@ -3,6 +3,10 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { createAdapters } from '../src/adapters/index.js';
+import { AuditLog } from '../src/assistant/audit.js';
+import type { ChatMessage, ChatModel, ToolSpec } from '../src/assistant/llm.js';
+import { EventHub } from '../src/events/eventHub.js';
+import { ProposalStore } from '../src/orchestration/proposals.js';
 import { buildApp } from '../src/app.js';
 import { signToken } from '../src/auth/tokens.js';
 import { defaultConfig, mergeConfig, type Config, type DeepPartial } from '../src/config.js';
@@ -24,6 +28,7 @@ export const ITEMS = {
 
 export interface TestOptions {
   config?: DeepPartial<Config>;
+  chatModel?: ChatModel;
   sizing?: Partial<SizingMockOptions>;
   pricing?: Partial<PricingMockOptions>;
   catalogue?: Partial<CatalogueMockOptions>;
@@ -48,16 +53,30 @@ export async function startTestEnv(options: TestOptions = {}) {
 
   const repo = InMemoryProjectRepository.fromFile(resolve(dataDir, 'projects.json'));
   const adapters = createAdapters(config);
-  const app = await buildApp({ config, repo, adapters, panels: await loadPanels() });
+  const events = new EventHub();
+  const proposals = new ProposalStore(config.assistant.proposalTtlMs);
+  const audit = new AuditLog();
+  const app = await buildApp({ config, repo, adapters, panels: await loadPanels(), events, proposals, audit, chatModel: options.chatModel });
 
-  const token = (role = 'sales_engineer', country = 'DE', expiresIn: string | number = '1h') =>
-    signToken(config.auth, { sub: `test-${role}`, role, country }, expiresIn);
+  /** Real HTTP listener, for the MCP client and SSE streams. Returns the base URL. */
+  const listen = async () => {
+    await app.listen({ host: '127.0.0.1', port: 0 });
+    return address(app);
+  };
 
-  const request = async (method: 'GET' | 'POST', url: string, opts: { role?: string; country?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
+  // Same subject as `npm run token`, so test users are members of the seed project P-24117.
+  const token = (role = 'sales_engineer', country = 'DE', expiresIn: string | number = '1h', sub = `user-${role}`) =>
+    signToken(config.auth, { sub, role, country }, expiresIn);
+
+  const request = async (
+    method: 'GET' | 'POST',
+    url: string,
+    opts: { role?: string; country?: string; sub?: string; body?: unknown; headers?: Record<string, string> } = {},
+  ) =>
     app.inject({
       method,
       url,
-      headers: { authorization: `Bearer ${await token(opts.role, opts.country)}`, ...opts.headers },
+      headers: { authorization: `Bearer ${await token(opts.role, opts.country, '1h', opts.sub)}`, ...opts.headers },
       ...(opts.body === undefined ? {} : { payload: opts.body as object }),
     });
 
@@ -66,7 +85,84 @@ export async function startTestEnv(options: TestOptions = {}) {
     await Promise.all([catalogue, sizing, pricing].map((mock) => mock.app.close()));
   };
 
-  return { app, config, repo, adapters, mocks: { catalogue, sizing, pricing }, token, request, close };
+  return { app, config, repo, adapters, events, proposals, audit, mocks: { catalogue, sizing, pricing }, token, request, listen, close };
+}
+
+/**
+ * A scripted language model. `script` decides each reply from the conversation so far, and every call is
+ * recorded, so tests can check exactly what the model was given (for example, that no prices reached it).
+ */
+export class FakeChatModel implements ChatModel {
+  readonly calls: Array<{ messages: ChatMessage[]; tools: ToolSpec[] }> = [];
+
+  constructor(private readonly script: (messages: ChatMessage[], round: number) => ChatMessage) {}
+
+  async complete(messages: ChatMessage[], tools: ToolSpec[]): Promise<ChatMessage> {
+    this.calls.push({ messages: structuredClone(messages), tools });
+    return this.script(messages, this.calls.length - 1);
+  }
+
+  /** Everything the model was shown as tool results, across all rounds. */
+  toolResultsSeen(): string {
+    return this.calls.flatMap((call) => call.messages.filter((message) => message.role === 'tool').map((message) => message.content ?? '')).join('\n');
+  }
+}
+
+export const callTool = (name: string, args: Record<string, unknown> = {}): ChatMessage => ({
+  role: 'assistant',
+  content: null,
+  tool_calls: [{ id: `call_${name}`, type: 'function', function: { name, arguments: JSON.stringify(args) } }],
+});
+
+export const say = (content: string): ChatMessage => ({ role: 'assistant', content });
+
+export interface ReceivedEvent {
+  event: string;
+  data: Record<string, unknown>;
+}
+
+/** Opens an SSE stream with fetch and collects its events, so tests can wait for one. */
+export async function openStream(url: string, headers: Record<string, string> = {}) {
+  const controller = new AbortController();
+  const response = await fetch(url, { headers, signal: controller.signal });
+  const received: ReceivedEvent[] = [];
+
+  if (response.ok && response.body) {
+    void (async () => {
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let end: number;
+          while ((end = buffer.indexOf('\n\n')) >= 0) {
+            const block = buffer.slice(0, end);
+            buffer = buffer.slice(end + 2);
+            const event = /^event: (.+)$/m.exec(block)?.[1];
+            const data = /^data: (.+)$/m.exec(block)?.[1];
+            if (event && data) received.push({ event, data: JSON.parse(data) as Record<string, unknown> });
+          }
+        }
+      } catch {
+        // aborted by close()
+      }
+    })();
+  }
+
+  const waitFor = async (match: (event: ReceivedEvent) => boolean, timeoutMs = 3_000) => {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const found = received.find(match);
+      if (found) return found;
+      await wait(20);
+    }
+    throw new Error(`No matching event within ${timeoutMs} ms; received: ${received.map((event) => event.event).join(', ')}`);
+  };
+
+  return { status: response.status, received, waitFor, close: () => controller.abort() };
 }
 
 export type TestEnv = Awaited<ReturnType<typeof startTestEnv>>;

@@ -49,6 +49,38 @@ describe('authentication', () => {
   });
 });
 
+describe('project access', () => {
+  const OTHER = 'P-30002';
+  const OTHER_DRIVE = 'a7c2e9f4-3b1d-4e8a-9f6c-0d2b5e8a1c07';
+
+  it('answers 404 on every route of a project the user is not a member of', async () => {
+    env = await startTestEnv();
+    const urls = [`/projects/${OTHER}`, `/projects/${OTHER}/bom`, `/projects/${OTHER}/items/${OTHER_DRIVE}/sidebar`, `/projects/${OTHER}/items/${OTHER_DRIVE}/panels/pricing`];
+
+    for (const url of urls) {
+      const res = await env.request('GET', url);
+      expect(res.statusCode, url).toBe(404);
+      expect(res.json().message).toBe(`Project ${OTHER} not found`);
+    }
+    const resize = await env.request('POST', `/projects/${OTHER}/items/${OTHER_DRIVE}/resize`, { body: { motorKw: 50 } });
+    expect(resize.statusCode).toBe(404);
+    expect(env.mocks.sizing.stats.calls + env.mocks.pricing.stats.calls + env.mocks.catalogue.stats.calls).toBe(0);
+  });
+
+  it('lets a member open their own project', async () => {
+    env = await startTestEnv();
+    const res = await env.request('GET', `/projects/${OTHER}/bom`, { sub: 'user-other-engineer' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().lines[0]).toMatchObject({ variantCode: 'R5-IP21', quantity: 1 });
+  });
+
+  it('lets an administrator open any project', async () => {
+    env = await startTestEnv();
+    const res = await env.request('GET', `/projects/${OTHER}`, { role: 'admin' });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
 describe('price entitlements', () => {
   it('marks pricing not_permitted for a channel partner and never calls the ERP', async () => {
     env = await startTestEnv();

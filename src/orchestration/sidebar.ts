@@ -33,6 +33,25 @@ export async function buildPanel(request: SidebarRequest, panelId: string) {
   return { itemId: request.item.itemId, itemRevision: request.item.revision, panel: panel.id, ...(await runPanel(panel, request)) };
 }
 
+/**
+ * For panels that answered `pending`: keep waiting in the background, then hand the result to `deliver`
+ * (which pushes it over SSE). The wait joins the same in-flight call, so the system is not called again.
+ */
+export function deliverLatePanels(
+  request: SidebarRequest,
+  panels: Record<string, PanelResponse>,
+  budgetMs: number,
+  deliver: (panelId: string, response: PanelResponse) => void,
+): void {
+  for (const [panelId, response] of Object.entries(panels)) {
+    const panel = request.panels.find((candidate) => candidate.id === panelId);
+    if (response.status !== 'pending' || !panel) continue;
+    void runPanel(panel, { ...request, budgetMs })
+      .then((late) => deliver(panelId, late))
+      .catch(() => undefined);
+  }
+}
+
 async function runPanel(panel: PanelDefinition, request: SidebarRequest): Promise<PanelResponse> {
   if (!panel.isPermitted(request.user)) return { status: 'not_permitted' };
   try {

@@ -82,6 +82,17 @@ describe('sidebar: partial results', () => {
     expect(env.mocks.sizing.stats.calls).toBe(2);
   });
 
+  it('rejects a sizing response in a changed format instead of showing bad data, without retrying', async () => {
+    // The vendor renames loadPct and returns the frame as a number: a breaking API change.
+    env = await startTestEnv({ sizing: { mapResponse: ({ frame, variantCode, loadPct }) => ({ frameSize: Number(frame.slice(1)), variantCode, load: loadPct }) } });
+    const { panels } = (await env.request('GET', sidebarUrl(ITEMS['DRV-03']))).json();
+
+    expect(panels.sizing).toMatchObject({ status: 'unavailable', message: expect.stringMatching(/Sizing tool returned an unexpected response \(frame: Required\)/) });
+    expect(panels.catalogue.status).toBe('ok');
+    expect(panels.pricing.status).toBe('ok');
+    expect(env.mocks.sizing.stats.calls).toBe(1);
+  });
+
   it('does not show a sizing panel for cabinets', async () => {
     env = await startTestEnv();
     const { panels } = (await env.request('GET', sidebarUrl(ITEMS['CAB-01']))).json();

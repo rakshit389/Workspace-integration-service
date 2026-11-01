@@ -18,7 +18,10 @@ export interface SystemConfig {
 export interface Config {
   port: number;
   auth: { secret: string; issuer: string; audience: string };
-  budgets: { sidebarMs: number; bomMs: number; resizeMs: number };
+  budgets: { sidebarMs: number; bomMs: number; resizeMs: number; assistantMs: number; latePanelMs: number };
+  assistant: { proposalTtlMs: number };
+  events: { ticketTtlMs: number; heartbeatMs: number };
+  llm: { baseUrl: string; model: string; apiKey?: string; timeoutMs: number; maxToolRounds: number };
   catalogue: SystemConfig;
   sizing: SystemConfig & { breaker: { failureThreshold: number; cooldownMs: number } };
   pricing: SystemConfig & { apiKey: string; ratePerSecond: number; maxQueueWaitMs: number };
@@ -30,7 +33,9 @@ const SECOND = 1_000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 
-export function defaultConfig(env: NodeJS.ProcessEnv = process.env): Config {
+export function defaultConfig(rawEnv: NodeJS.ProcessEnv = process.env): Config {
+  // An empty value (e.g. `PORT=` copied from .env.example) means "not set", so the default applies.
+  const env: NodeJS.ProcessEnv = Object.fromEntries(Object.entries(rawEnv).filter(([, value]) => value !== undefined && value.trim() !== ''));
   return {
     port: Number(env.PORT ?? 3000),
     auth: {
@@ -43,6 +48,28 @@ export function defaultConfig(env: NodeJS.ProcessEnv = process.env): Config {
       sidebarMs: Number(env.SIDEBAR_BUDGET_MS ?? 600),
       bomMs: Number(env.BOM_BUDGET_MS ?? 2_500),
       resizeMs: Number(env.RESIZE_BUDGET_MS ?? 8_000),
+      // The assistant is not on the 1 s click path, so it may wait longer for a complete answer.
+      assistantMs: Number(env.ASSISTANT_BUDGET_MS ?? 3_000),
+      // How long a panel that answered `pending` keeps waiting before its result is pushed over SSE.
+      latePanelMs: Number(env.LATE_PANEL_MS ?? 10_000),
+    },
+    assistant: {
+      // A re-size proposed by the assistant must be confirmed by the user within this time.
+      proposalTtlMs: 10 * MINUTE,
+    },
+    events: {
+      // Browsers cannot send headers with EventSource, so they exchange their token for a short-lived ticket.
+      ticketTtlMs: 60 * SECOND,
+      heartbeatMs: 15 * SECOND,
+    },
+    llm: {
+      // Any OpenAI-compatible endpoint. The default is a local Ollama model, so no data leaves the machine;
+      // production points this at the private Azure OpenAI endpoint inside the customer's tenant.
+      baseUrl: env.LLM_BASE_URL ?? 'http://127.0.0.1:11434/v1',
+      model: env.LLM_MODEL ?? 'qwen2.5:3b',
+      apiKey: env.LLM_API_KEY,
+      timeoutMs: Number(env.LLM_TIMEOUT_MS ?? 60_000),
+      maxToolRounds: 5,
     },
     catalogue: {
       baseUrl: env.CATALOGUE_URL ?? 'http://127.0.0.1:4001',

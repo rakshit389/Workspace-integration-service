@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { Config } from '../config.js';
 import type { SizingInputs, User } from '../domain/types.js';
 import { TtlCache } from '../resilience/cache.js';
@@ -6,11 +7,14 @@ import { ResilientFetcher, type Outcome } from '../resilience/resilientFetcher.j
 import { isRetryable, withRetry } from '../resilience/retry.js';
 import { requestJson } from './http.js';
 
-export interface SizingResult {
-  frame: string;
-  variantCode: string;
-  loadPct: number;
-}
+/** The sizing tool's response contract (API v1). A format change fails here, not in a panel. */
+const sizingResultSchema = z.object({
+  frame: z.string(),
+  variantCode: z.string(),
+  loadPct: z.number().min(0).max(100),
+});
+
+export type SizingResult = z.infer<typeof sizingResultSchema>;
 
 /**
  * Sizing adapter: slow (seconds), rate-limited and down for maintenance every night, so every call goes
@@ -34,7 +38,7 @@ export class SizingAdapter {
     return withRetry(
       () =>
         this.breaker.exec(() =>
-          requestJson<SizingResult>('Sizing tool', `${this.config.baseUrl}/size`, {
+          requestJson('Sizing tool', `${this.config.baseUrl}/size`, sizingResultSchema, {
             method: 'POST',
             // Production exchanges the user's token on-behalf-of for a sizing-scoped token; the mock accepts it as is.
             headers: { authorization: `Bearer ${user.token}` },

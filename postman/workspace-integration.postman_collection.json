@@ -1,0 +1,1099 @@
+{
+  "info": {
+    "name": "Workspace integration service",
+    "description": "Every endpoint of the workspace integration service.\n\n1. Start the service: `npm start` in the project folder.\n2. Run the requests top to bottom. Each folder signs its own login token for its role, so nothing has to be copied.\n\nRe-sizing changes DRV-03. To start again from the original data, restart `npm start`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "projectId",
+      "value": "P-24117"
+    },
+    {
+      "key": "otherProjectId",
+      "value": "P-30002"
+    },
+    {
+      "key": "drv03",
+      "value": "3f6c1d2e-0a41-4b8e-9d1e-2b7c1f0a9e03"
+    },
+    {
+      "key": "otherDrive",
+      "value": "a7c2e9f4-3b1d-4e8a-9f6c-0d2b5e8a1c07"
+    },
+    {
+      "key": "country",
+      "value": "DE"
+    },
+    {
+      "key": "jwtSecret",
+      "value": "local-dev-secret-change-me-0123456789abcdef"
+    },
+    {
+      "key": "issuer",
+      "value": "https://idp.mock.local"
+    },
+    {
+      "key": "audience",
+      "value": "workspace-api"
+    },
+    {
+      "key": "proposalId",
+      "value": ""
+    },
+    {
+      "key": "ticket",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Sales engineer",
+      "description": "Sees everything, including prices. Run 'Sidebar' twice: sizing is usually 'pending' the first time and 'ok' the second.",
+      "item": [
+        {
+          "name": "Health (no login)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Is the service running?",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Project items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}"
+              ]
+            },
+            "description": "Items in the project with their IDs."
+          }
+        },
+        {
+          "name": "Sidebar for DRV-03",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/items/{{drv03}}/sidebar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "items",
+                "{{drv03}}",
+                "sidebar"
+              ]
+            },
+            "description": "All panels for DRV-03 within the time budget. Each panel has its own status."
+          }
+        },
+        {
+          "name": "One panel: sizing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/items/{{drv03}}/panels/sizing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "items",
+                "{{drv03}}",
+                "panels",
+                "sizing"
+              ]
+            },
+            "description": "Reloads only the sizing panel, e.g. after it was 'pending'."
+          }
+        },
+        {
+          "name": "BOM with prices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/bom",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "bom"
+              ]
+            },
+            "description": "Parts list with prices, total and longest lead time."
+          }
+        },
+        {
+          "name": "Catalogue search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalogue/search?kind=drive&minKw=90&ipRating=IP54",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalogue",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "kind",
+                  "value": "drive"
+                },
+                {
+                  "key": "minKw",
+                  "value": "90"
+                },
+                {
+                  "key": "ipRating",
+                  "value": "IP54"
+                }
+              ]
+            },
+            "description": "Drives of at least 90 kW with IP54."
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Signs a local dev token for this folder's role, the same way `npm run token` does.",
+              "const CryptoJS = require('crypto-js');",
+              "const b64url = (words) => CryptoJS.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+              "const part = (obj) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+              "const now = Math.floor(Date.now() / 1000);",
+              "const payload = {",
+              "  sub: 'user-sales_engineer',",
+              "  role: 'sales_engineer',",
+              "  country: pm.collectionVariables.get('country'),",
+              "  iss: pm.collectionVariables.get('issuer'),",
+              "  aud: pm.collectionVariables.get('audience'),",
+              "  iat: now,",
+              "  exp: now + 3600,",
+              "};",
+              "const unsigned = part({ alg: 'HS256', typ: 'JWT' }) + '.' + part(payload);",
+              "const signature = b64url(CryptoJS.HmacSHA256(unsigned, pm.collectionVariables.get('jwtSecret')));",
+              "pm.variables.set('token', unsigned + '.' + signature);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Channel partner",
+      "description": "Same project, but prices and lead times are never shown and the pricing system is not called.",
+      "item": [
+        {
+          "name": "Sidebar: pricing not permitted",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/items/{{drv03}}/sidebar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "items",
+                "{{drv03}}",
+                "sidebar"
+              ]
+            },
+            "description": "The pricing panel is 'not_permitted'."
+          }
+        },
+        {
+          "name": "BOM without prices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/bom",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "bom"
+              ]
+            },
+            "description": "Lines and quantities only; no price fields at all."
+          }
+        },
+        {
+          "name": "Re-size is forbidden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/items/{{drv03}}/resize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "items",
+                "{{drv03}}",
+                "resize"
+              ]
+            },
+            "description": "Expect 403: channel partners cannot change items.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motorKw\": 110\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Chat: the same cost question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/assistant/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "assistant",
+                "messages"
+              ]
+            },
+            "description": "The assistant cannot see prices for this role, so it says they are not available. Needs Ollama.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What will this layout cost, and which item has the longest lead time?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Signs a local dev token for this folder's role, the same way `npm run token` does.",
+              "const CryptoJS = require('crypto-js');",
+              "const b64url = (words) => CryptoJS.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+              "const part = (obj) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+              "const now = Math.floor(Date.now() / 1000);",
+              "const payload = {",
+              "  sub: 'user-channel_partner',",
+              "  role: 'channel_partner',",
+              "  country: pm.collectionVariables.get('country'),",
+              "  iss: pm.collectionVariables.get('issuer'),",
+              "  aud: pm.collectionVariables.get('audience'),",
+              "  iat: now,",
+              "  exp: now + 3600,",
+              "};",
+              "const unsigned = part({ alg: 'HS256', typ: 'JWT' }) + '.' + part(payload);",
+              "const signature = b64url(CryptoJS.HmacSHA256(unsigned, pm.collectionVariables.get('jwtSecret')));",
+              "pm.variables.set('token', unsigned + '.' + signature);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Re-size",
+      "description": "Changes DRV-03 for a 110 kW motor: R7 becomes R8. Restart `npm start` to reset.",
+      "item": [
+        {
+          "name": "Re-size DRV-03 to 110 kW",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-resize-1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/items/{{drv03}}/resize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "items",
+                "{{drv03}}",
+                "resize"
+              ]
+            },
+            "description": "Returns the new variant, 3D model and BOM change. Sending it again with the same Idempotency-Key returns the same answer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motorKw\": 110\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Re-size with an old revision (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/items/{{drv03}}/resize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "items",
+                "{{drv03}}",
+                "resize"
+              ]
+            },
+            "description": "Expect 409: the item is no longer at revision 1.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motorKw\": 150,\n  \"baseRevision\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Invalid body (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/items/{{drv03}}/resize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "items",
+                "{{drv03}}",
+                "resize"
+              ]
+            },
+            "description": "Expect 400: motorKw must be positive.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motorKw\": -5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Signs a local dev token for this folder's role, the same way `npm run token` does.",
+              "const CryptoJS = require('crypto-js');",
+              "const b64url = (words) => CryptoJS.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+              "const part = (obj) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+              "const now = Math.floor(Date.now() / 1000);",
+              "const payload = {",
+              "  sub: 'user-sales_engineer',",
+              "  role: 'sales_engineer',",
+              "  country: pm.collectionVariables.get('country'),",
+              "  iss: pm.collectionVariables.get('issuer'),",
+              "  aud: pm.collectionVariables.get('audience'),",
+              "  iat: now,",
+              "  exp: now + 3600,",
+              "};",
+              "const unsigned = part({ alg: 'HS256', typ: 'JWT' }) + '.' + part(payload);",
+              "const signature = b64url(CryptoJS.HmacSHA256(unsigned, pm.collectionVariables.get('jwtSecret')));",
+              "pm.variables.set('token', unsigned + '.' + signature);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. AI assistant (MCP)",
+      "description": "The assistant's tools, called as the sales engineer. resize_item only proposes; '5. Confirm the proposal' applies it.",
+      "item": [
+        {
+          "name": "1. List tools",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "The five tools the assistant can use.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/list\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2. get_bom_cost",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "What will this layout cost, and which item has the longest lead time?",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"get_bom_cost\",\n    \"arguments\": {\n      \"projectId\": \"{{projectId}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. get_item_details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Everything about DRV-03.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"get_item_details\",\n    \"arguments\": {\n      \"projectId\": \"{{projectId}}\",\n      \"item\": \"DRV-03\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4. search_catalogue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Find cabinets.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"search_catalogue\",\n    \"arguments\": {\n      \"text\": \"cabinet\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5. resize_item (proposal only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Proposes re-sizing DRV-04 to 80 kW. The item does not change yet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"resize_item\",\n    \"arguments\": {\n      \"projectId\": \"{{projectId}}\",\n      \"item\": \"DRV-04\",\n      \"motorKw\": 80\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Saves the proposal ID so '5. Confirm the proposal' can use it.",
+                  "const result = JSON.parse(pm.response.json().result.content[0].text);",
+                  "if (result.proposalId) pm.collectionVariables.set('proposalId', result.proposalId);",
+                  "pm.test('a proposal was created, nothing changed yet', () => pm.expect(result.status).to.eql('confirmation_required'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Confirm the proposal",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/assistant/proposals/{{proposalId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "assistant",
+                "proposals",
+                "{{proposalId}}",
+                "confirm"
+              ]
+            },
+            "description": "The user's browser confirms; now DRV-04 changes. Sending it a second time returns 404."
+          }
+        },
+        {
+          "name": "7. resize_item again (to cancel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "A new proposal, this time to reject.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"resize_item\",\n    \"arguments\": {\n      \"projectId\": \"{{projectId}}\",\n      \"item\": \"DRV-04\",\n      \"motorKw\": 120\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Saves the proposal ID so '5. Confirm the proposal' can use it.",
+                  "const result = JSON.parse(pm.response.json().result.content[0].text);",
+                  "if (result.proposalId) pm.collectionVariables.set('proposalId', result.proposalId);",
+                  "pm.test('a proposal was created, nothing changed yet', () => pm.expect(result.status).to.eql('confirmation_required'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Cancel the proposal",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/assistant/proposals/{{proposalId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "assistant",
+                "proposals",
+                "{{proposalId}}",
+                "cancel"
+              ]
+            },
+            "description": "The user rejects the proposal; nothing changes."
+          }
+        },
+        {
+          "name": "9. Chat: ask the assistant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/assistant/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "assistant",
+                "messages"
+              ]
+            },
+            "description": "Needs a language model: Ollama running with qwen2.5:3b (see README). Without one this returns 503.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What will this layout cost, and which item has the longest lead time?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Signs a local dev token for this folder's role, the same way `npm run token` does.",
+              "const CryptoJS = require('crypto-js');",
+              "const b64url = (words) => CryptoJS.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+              "const part = (obj) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+              "const now = Math.floor(Date.now() / 1000);",
+              "const payload = {",
+              "  sub: 'user-sales_engineer',",
+              "  role: 'sales_engineer',",
+              "  country: pm.collectionVariables.get('country'),",
+              "  iss: pm.collectionVariables.get('issuer'),",
+              "  aud: pm.collectionVariables.get('audience'),",
+              "  iat: now,",
+              "  exp: now + 3600,",
+              "};",
+              "const unsigned = part({ alg: 'HS256', typ: 'JWT' }) + '.' + part(payload);",
+              "const signature = b64url(CryptoJS.HmacSHA256(unsigned, pm.collectionVariables.get('jwtSecret')));",
+              "pm.variables.set('token', unsigned + '.' + signature);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Access checks",
+      "description": "Projects are for members only; anything else answers 404.",
+      "item": [
+        {
+          "name": "Someone else's project (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{otherProjectId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{otherProjectId}}"
+              ]
+            },
+            "description": "Expect 404: not a member."
+          }
+        },
+        {
+          "name": "No token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/bom",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "bom"
+              ]
+            },
+            "description": "Expect 401.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Signs a local dev token for this folder's role, the same way `npm run token` does.",
+              "const CryptoJS = require('crypto-js');",
+              "const b64url = (words) => CryptoJS.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+              "const part = (obj) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+              "const now = Math.floor(Date.now() / 1000);",
+              "const payload = {",
+              "  sub: 'user-sales_engineer',",
+              "  role: 'sales_engineer',",
+              "  country: pm.collectionVariables.get('country'),",
+              "  iss: pm.collectionVariables.get('issuer'),",
+              "  aud: pm.collectionVariables.get('audience'),",
+              "  iat: now,",
+              "  exp: now + 3600,",
+              "};",
+              "const unsigned = part({ alg: 'HS256', typ: 'JWT' }) + '.' + part(payload);",
+              "const signature = b64url(CryptoJS.HmacSHA256(unsigned, pm.collectionVariables.get('jwtSecret')));",
+              "pm.variables.set('token', unsigned + '.' + signature);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Administrator",
+      "description": "Administrators can open every project.",
+      "item": [
+        {
+          "name": "Someone else's project as admin",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{otherProjectId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{otherProjectId}}"
+              ]
+            },
+            "description": "Expect 200."
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Signs a local dev token for this folder's role, the same way `npm run token` does.",
+              "const CryptoJS = require('crypto-js');",
+              "const b64url = (words) => CryptoJS.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+              "const part = (obj) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+              "const now = Math.floor(Date.now() / 1000);",
+              "const payload = {",
+              "  sub: 'user-admin',",
+              "  role: 'admin',",
+              "  country: pm.collectionVariables.get('country'),",
+              "  iss: pm.collectionVariables.get('issuer'),",
+              "  aud: pm.collectionVariables.get('audience'),",
+              "  iat: now,",
+              "  exp: now + 3600,",
+              "};",
+              "const unsigned = part({ alg: 'HS256', typ: 'JWT' }) + '.' + part(payload);",
+              "const signature = b64url(CryptoJS.HmacSHA256(unsigned, pm.collectionVariables.get('jwtSecret')));",
+              "pm.variables.set('token', unsigned + '.' + signature);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Server push (SSE)",
+      "description": "Open the stream first, then run 'Sidebar for DRV-03' in another tab: a pending sizing panel arrives here as 'panel.updated'.",
+      "item": [
+        {
+          "name": "Open the event stream",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "events"
+              ]
+            },
+            "description": "Stays open and shows events as they arrive. Stop it with Cancel."
+          }
+        },
+        {
+          "name": "Get a stream ticket",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/events/ticket",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "events",
+                "ticket"
+              ]
+            },
+            "description": "For browsers, which cannot send a token header with EventSource."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Saves the ticket so 'Open the event stream with the ticket' can use it.",
+                  "pm.collectionVariables.set('ticket', pm.response.json().ticket);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open the event stream with the ticket",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/events?ticket={{ticket}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "ticket",
+                  "value": "{{ticket}}"
+                }
+              ]
+            },
+            "description": "No login header: the ticket works once, for 60 seconds.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Signs a local dev token for this folder's role, the same way `npm run token` does.",
+              "const CryptoJS = require('crypto-js');",
+              "const b64url = (words) => CryptoJS.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+              "const part = (obj) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+              "const now = Math.floor(Date.now() / 1000);",
+              "const payload = {",
+              "  sub: 'user-sales_engineer',",
+              "  role: 'sales_engineer',",
+              "  country: pm.collectionVariables.get('country'),",
+              "  iss: pm.collectionVariables.get('issuer'),",
+              "  aud: pm.collectionVariables.get('audience'),",
+              "  iat: now,",
+              "  exp: now + 3600,",
+              "};",
+              "const unsigned = part({ alg: 'HS256', typ: 'JWT' }) + '.' + part(payload);",
+              "const signature = b64url(CryptoJS.HmacSHA256(unsigned, pm.collectionVariables.get('jwtSecret')));",
+              "pm.variables.set('token', unsigned + '.' + signature);"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

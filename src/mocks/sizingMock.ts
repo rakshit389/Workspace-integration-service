@@ -7,6 +7,8 @@ export interface SizingMockOptions {
   maxLatencyMs: number;
   failRate: number;
   random: () => number;
+  /** Lets a test simulate the vendor changing its response format. */
+  mapResponse: (result: { frame: string; variantCode: string; loadPct: number }) => unknown;
 }
 
 interface SizeBody {
@@ -17,7 +19,14 @@ interface SizeBody {
 
 /** Sizing tool mock: 0.5–3 s per run and 20 % failures by default, as in the brief. */
 export function createSizingMock(data: CatalogueData, overrides: Partial<SizingMockOptions> = {}) {
-  const options: SizingMockOptions = { minLatencyMs: 500, maxLatencyMs: 3_000, failRate: 0.2, random: Math.random, ...overrides };
+  const options: SizingMockOptions = {
+    minLatencyMs: 500,
+    maxLatencyMs: 3_000,
+    failRate: 0.2,
+    random: Math.random,
+    mapResponse: (result) => result,
+    ...overrides,
+  };
   const stats = { calls: 0, failures: 0 };
   const drives = data.variants
     .filter((variant) => variant.kind === 'drive' && variant.ratedKw !== undefined)
@@ -40,7 +49,7 @@ export function createSizingMock(data: CatalogueData, overrides: Partial<SizingM
     // The smallest frame that runs the motor at or below 95 % of its rating.
     const drive = drives.find((candidate) => candidate.ipRating === ipRating && (motorKw / candidate.ratedKw!) * 100 <= 95);
     if (!drive) return reply.code(422).send({ error: 'no frame is large enough for this motor' });
-    return { frame: drive.frame, variantCode: drive.variantCode, loadPct: Math.round((motorKw / drive.ratedKw!) * 100) };
+    return options.mapResponse({ frame: drive.frame!, variantCode: drive.variantCode, loadPct: Math.round((motorKw / drive.ratedKw!) * 100) });
   });
 
   return { app, stats, options };

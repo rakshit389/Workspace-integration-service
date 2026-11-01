@@ -1,3 +1,4 @@
+import type { ZodType } from 'zod';
 import { UpstreamError } from '../errors.js';
 
 export interface RequestOptions {
@@ -7,10 +8,14 @@ export interface RequestOptions {
   timeoutMs: number;
 }
 
-/** JSON over HTTP with a hard timeout. Every failure becomes an UpstreamError the retry logic understands. */
-export async function requestJson<T>(system: string, url: string, options: RequestOptions): Promise<T> {
+/**
+ * JSON over HTTP with a hard timeout. The response is checked against `schema`, so a vendor that
+ * changes its format produces a clear, non-retryable UpstreamError instead of bad data in a panel.
+ */
+export async function requestJson<T>(system: string, url: string, schema: ZodType<T>, options: RequestOptions): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs);
+  let body: unknown;
   try {
     const response = await fetch(url, {
       method: options.method ?? 'GET',
@@ -29,7 +34,7 @@ export async function requestJson<T>(system: string, url: string, options: Reque
         retryAfter ? Number(retryAfter) * 1_000 : undefined,
       );
     }
-    return (await response.json()) as T;
+    body = await response.json();
   } catch (error) {
     if (error instanceof UpstreamError) throw error;
     if (controller.signal.aborted) {
@@ -39,4 +44,13 @@ export async function requestJson<T>(system: string, url: string, options: Reque
   } finally {
     clearTimeout(timer);
   }
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const where = issue?.path.length ? issue.path.join('.') : 'body';
+    // Retrying will not fix a format change; it is logged and alerted on, and the panel shows unavailable.
+    throw new UpstreamError(system, undefined, `${system} returned an unexpected response (${where}: ${issue?.message ?? 'invalid'})`, false);
+  }
+  return parsed.data;
 }
