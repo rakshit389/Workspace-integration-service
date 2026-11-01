@@ -19,8 +19,5 @@ services:
     env_file:
       - path: .env
         required: false
-    environment:
-      # Reaches the API container by its service name on the compose network.
-      API_URL: http://api:3000
     depends_on:
       - api

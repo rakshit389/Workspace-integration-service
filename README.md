@@ -140,12 +140,15 @@ Without it, chat answers `503`; everything else still works. The tests use a fak
 | Container | Port | Contains |
 |---|---|---|
 | `api` | 3000 | The API and the three mocked systems |
-| `mcp` | 3001 | The MCP service; reaches the API at `http://api:3000` |
+| `mcp` | 3001 | The MCP service |
 
 - **Settings** go in `.env` (copied from `.env.example`). Empty values use the defaults. `.env` is not committed and not copied into the image.
-- **For chat in Docker**, add this to `.env`, so the API container can reach Ollama on your machine:
+- **For Docker, set these two in `.env`:**
 
   ```
+  # The MCP container reaches the API container by its service name
+  API_URL=http://api:3000
+  # The API container reaches Ollama on your machine (for chat)
   LLM_BASE_URL=http://host.docker.internal:11434/v1
   ```
 
