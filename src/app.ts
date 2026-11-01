@@ -1,10 +1,8 @@
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Adapters } from './adapters/index.js';
 import { AuditLog } from './assistant/audit.js';
 import { chatBodySchema, localToolRunner, runChat, type ChatTurn } from './assistant/chat.js';
 import { OpenAICompatibleChatModel, type ChatModel } from './assistant/llm.js';
-import { buildMcpServer } from './assistant/mcpServer.js';
 import { requireKnownRole, requireProjectAccess, requireResize } from './auth/policy.js';
 import type { CatalogueSearch } from './adapters/catalogue.js';
 import { authenticate } from './auth/tokens.js';
@@ -14,7 +12,7 @@ import { HttpError } from './errors.js';
 import { EventHub, StreamTicketStore } from './events/eventHub.js';
 import { buildBom } from './orchestration/bom.js';
 import { IdempotencyStore } from './orchestration/idempotency.js';
-import { ProposalStore } from './orchestration/proposals.js';
+import { ProposalStore, proposeResize } from './orchestration/proposals.js';
 import { applyResize, resizeItem, resizeResponse, type ResizeBody } from './orchestration/resize.js';
 import { buildPanel, buildSidebar, deliverLatePanels, type SidebarRequest } from './orchestration/sidebar.js';
 import type { PanelDefinition } from './panels/types.js';
@@ -237,26 +235,25 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
     });
   });
 
-  // ---- AI assistant: MCP tools and user confirmation ----
+  // ---- AI assistant: proposals, confirmation and chat ----
 
-  app.post('/mcp', async (request, reply) => {
-    const server = buildMcpServer(request.user!, { config, repo, adapters, panels, proposals, audit });
-    // Stateless: one server and transport per request, bound to the caller's identity.
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    reply.hijack();
-    reply.raw.on('close', () => {
-      void transport.close();
-      void server.close();
-    });
-    await server.connect(transport);
-    await transport.handleRequest(request.raw, reply.raw, request.body);
-  });
-
-  const methodNotAllowed = async () => {
-    throw new HttpError(405, 'method_not_allowed', 'This MCP endpoint is stateless; use POST');
-  };
-  app.get('/mcp', methodNotAllowed);
-  app.delete('/mcp', methodNotAllowed);
+  // Works out a re-size and stores it as a proposal; nothing changes until the user confirms.
+  // The MCP service's resize_item tool calls this with the user's token.
+  app.post<{ Params: ItemParams; Body: { motorKw: number; voltage?: number } }>(
+    '/projects/:projectId/items/:itemId/resize-proposals',
+    { schema: { body: { ...resizeBodySchema, properties: { motorKw: resizeBodySchema.properties.motorKw, voltage: resizeBodySchema.properties.voltage } } } },
+    async (request) => {
+      const user = request.user!;
+      const { projectId, itemId } = request.params;
+      requireProjectAccess(user, repo.getProject(projectId));
+      const { project, item } = repo.getItem(projectId, itemId);
+      const result = await proposeResize({ user, project, item, motorKw: request.body.motorKw, voltage: request.body.voltage, adapters, proposals, budgetMs: config.budgets.resizeMs });
+      if (result.status === 'confirmation_required') {
+        audit.record(user, { action: 'resize_item', input: { projectId, itemId, motorKw: request.body.motorKw }, outcome: 'proposed' });
+      }
+      return result;
+    },
+  );
 
   // Chat: the language model answers by calling the same tools, each run as this user.
   app.post<{ Params: { projectId: string }; Body: { message: string; history?: ChatTurn[] } }>(

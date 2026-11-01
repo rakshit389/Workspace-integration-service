@@ -22,6 +22,7 @@ export interface Config {
   assistant: { proposalTtlMs: number };
   events: { ticketTtlMs: number; heartbeatMs: number };
   llm: { baseUrl: string; model: string; apiKey?: string; timeoutMs: number; maxToolRounds: number };
+  mcp: { port: number; apiUrl: string; apiTimeoutMs: number };
   catalogue: SystemConfig;
   sizing: SystemConfig & { breaker: { failureThreshold: number; cooldownMs: number } };
   pricing: SystemConfig & { apiKey: string; ratePerSecond: number; maxQueueWaitMs: number };
@@ -70,6 +71,12 @@ export function defaultConfig(rawEnv: NodeJS.ProcessEnv = process.env): Config {
       apiKey: env.LLM_API_KEY,
       timeoutMs: Number(env.LLM_TIMEOUT_MS ?? 60_000),
       maxToolRounds: 5,
+    },
+    mcp: {
+      // The MCP service is a separate process that reaches the workspace API over REST.
+      port: Number(env.MCP_PORT ?? 3001),
+      apiUrl: env.API_URL ?? 'http://127.0.0.1:3000',
+      apiTimeoutMs: 15 * SECOND,
     },
     catalogue: {
       baseUrl: env.CATALOGUE_URL ?? 'http://127.0.0.1:4001',

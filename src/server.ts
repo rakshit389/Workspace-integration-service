@@ -35,7 +35,7 @@ await app.listen({ host: '0.0.0.0', port: config.port });
 
 console.log(`
 Workspace integration service on http://localhost:${config.port}
-  MCP tools:     POST http://localhost:${config.port}/mcp
+  MCP tools:     separate service, start it with: npm run start:mcp
   Chat:          POST http://localhost:${config.port}/projects/P-24117/assistant/messages  (model: ${config.llm.model} at ${config.llm.baseUrl})
   Event stream:  GET  http://localhost:${config.port}/projects/P-24117/events
 Mocks: ${mocks.map((mock) => `${mock.name} ${mock.url}`).join(', ')}

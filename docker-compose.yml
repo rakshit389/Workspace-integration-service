@@ -1,0 +1,26 @@
+# Starts the workspace API and the MCP service as two containers from the same image.
+#   docker compose up --build
+services:
+  api:
+    build: .
+    image: workspace-integration-service
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
+
+  mcp:
+    build: .
+    image: workspace-integration-service
+    command: ["node", "dist/src/mcpService.js"]
+    ports:
+      - "3001:3001"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Reaches the API container by its service name on the compose network.
+      API_URL: http://api:3000
+    depends_on:
+      - api

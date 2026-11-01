@@ -9,12 +9,14 @@
   },
   "scripts": {
     "start": "tsx src/server.ts",
+    "start:mcp": "tsx src/mcpService.ts",
     "dev": "tsx watch src/server.ts",
     "token": "tsx scripts/token.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "start:prod": "node dist/src/server.js"
+    "start:prod": "node dist/src/server.js",
+    "start:mcp:prod": "node dist/src/mcpService.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

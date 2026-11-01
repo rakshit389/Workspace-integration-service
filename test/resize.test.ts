@@ -93,6 +93,15 @@ describe('re-size', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('creates a proposal without changing the item (used by the MCP service)', async () => {
+    env = await startTestEnv();
+    const res = await env.request('POST', `/projects/${PROJECT}/items/${ITEMS['DRV-03']}/resize-proposals`, { body: { motorKw: 110 } });
+
+    expect(res.json()).toMatchObject({ status: 'confirmation_required', change: { variantCode: 'R8-IP54' } });
+    expect(env.repo.getItem(PROJECT, ITEMS['DRV-03']).item).toMatchObject({ variantCode: 'R7-IP54', revision: 1 });
+    expect((await env.request('POST', `/projects/${PROJECT}/items/${ITEMS['DRV-03']}/resize-proposals`, { role: 'channel_partner', body: { motorKw: 110 } })).statusCode).toBe(403);
+  });
+
   it('only re-sizes drives', async () => {
     env = await startTestEnv();
     const res = await env.request('POST', resizeUrl(ITEMS['CAB-01']), { body: { motorKw: 110 } });

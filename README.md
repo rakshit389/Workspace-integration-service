@@ -4,26 +4,29 @@ The backend for the sidebar of the 3D sales workspace. For a selected item, it c
 
 The three systems are mocked and start automatically, so nothing else is needed.
 
+It runs as **two services**:
+
+- **API** (port 3000): the sidebar, BOM, re-size, live updates and chat. It holds all data and rules.
+- **MCP service** (port 3001): AI tools for external AI apps. It holds no data; it calls the API with each user's token.
+
 ## Quick start
 
 **Option 1: Node.js 20 or later**
 
 ```bash
 npm install
-npm start
+npm start              # API on :3000
+npm run start:mcp      # MCP service on :3001, in a second terminal
 ```
 
-**Option 2: Docker**
+**Option 2: Docker** (starts both)
 
 ```bash
 cp .env.example .env
-docker build -t workspace-integration-service .
-docker run --rm -p 3000:3000 --env-file .env workspace-integration-service
+docker compose up --build
 ```
 
-The API is now on `http://localhost:3000`.
-
-**Run the tests:** `npm test` (77 tests, about 3 seconds).
+**Run the tests:** `npm test` (79 tests, about 3 seconds).
 
 ## Try it
 
@@ -42,6 +45,8 @@ The demo data (`data/projects.json`) has project **P-24117** with two drives, tw
 
 ## Endpoints
 
+**API** (`http://localhost:3000`)
+
 | Method | Path | What it does |
 |---|---|---|
 | GET | `/projects/:projectId` | Lists the items in a project |
@@ -52,10 +57,17 @@ The demo data (`data/projects.json`) has project **P-24117** with two drives, tw
 | GET | `/catalogue/search` | Searches products, e.g. `?kind=drive&minKw=90` |
 | GET | `/projects/:projectId/events` | Live updates (Server-Sent Events) |
 | POST | `/projects/:projectId/events/ticket` | One-time ticket to open live updates from a browser |
-| POST | `/mcp` | AI tools, for any MCP client |
+| POST | `/projects/:projectId/items/:itemId/resize-proposals` | Proposes a re-size without applying it |
 | POST | `/projects/:projectId/assistant/messages` | Chat with the AI assistant |
 | POST | `/projects/:projectId/assistant/proposals/:id/confirm` | Confirm a change the assistant proposed |
 | POST | `/projects/:projectId/assistant/proposals/:id/cancel` | Reject it |
+| GET | `/health` | Is the service up? (no login needed) |
+
+**MCP service** (`http://localhost:3001`)
+
+| Method | Path | What it does |
+|---|---|---|
+| POST | `/mcp` | AI tools, for any MCP client |
 | GET | `/health` | Is the service up? (no login needed) |
 
 All routes except `/health` need `Authorization: Bearer <token>`.
@@ -106,8 +118,10 @@ The assistant has five tools. They run **as the user**, so the AI can never see 
 
 **Two ways to use the tools:**
 
-- **External AI apps** (for example MCP Inspector or Claude Desktop) connect to `/mcp` with a user's token.
-- **Our chat** (`/assistant/messages`) uses a language model to answer questions with these tools.
+- **External AI apps** (for example MCP Inspector or Claude Desktop) connect to the **MCP service** at `http://localhost:3001/mcp` with a user's token. Each tool calls the API's normal endpoints with that token, so the API checks permissions exactly as for the workspace.
+- **Our chat** (`/assistant/messages` on the API) uses a language model and runs the same tools inside the API.
+
+The tool names and descriptions are defined once (`src/assistant/toolDefinitions.ts`), so both see the same tools.
 
 **Chat needs a local language model** (free, runs on your machine):
 
@@ -121,17 +135,22 @@ Without it, chat answers `503`; everything else still works. The tests use a fak
 
 ## Docker
 
-The image contains the API and the three mocked systems. Only port 3000 needs publishing.
+`docker compose up --build` starts two containers from one image:
+
+| Container | Port | Contains |
+|---|---|---|
+| `api` | 3000 | The API and the three mocked systems |
+| `mcp` | 3001 | The MCP service; reaches the API at `http://api:3000` |
 
 - **Settings** go in `.env` (copied from `.env.example`). Empty values use the defaults. `.env` is not committed and not copied into the image.
-- **For chat in Docker**, add this to `.env`, so the container can reach Ollama on your machine:
+- **For chat in Docker**, add this to `.env`, so the API container can reach Ollama on your machine:
 
   ```
   LLM_BASE_URL=http://host.docker.internal:11434/v1
   ```
 
-- **Run in the background:** add `-d --name wis` to `docker run`. See logs with `docker logs -f wis`, stop with `docker stop wis`.
-- **Rebuild** the image after changing code. Each run starts from the demo data again.
+- **Run in the background:** `docker compose up --build -d`. See logs with `docker compose logs -f`, stop with `docker compose down`.
+- Each start begins from the demo data again.
 
 ## How the code is organised
 
@@ -144,7 +163,7 @@ Every request goes through four layers:
 | 3. Orchestration | `src/orchestration/` | Combines systems into features (sidebar, BOM, re-size) |
 | 4. Adapters | `src/adapters/` | Talks to one system each, with cache, retries and limits |
 
-Other folders: `src/panels/` (sidebar panels), `src/assistant/` (AI tools and chat), `src/events/` (live updates), `src/mocks/` (fake enterprise systems).
+Other folders: `src/panels/` (sidebar panels), `src/assistant/` (AI tools and chat), `src/events/` (live updates), `src/mocks/` (fake enterprise systems), `src/mcp/` (the separate MCP service).
 
 **Adding a new system:** add one file to `src/panels/`, for example `documents.panel.ts`. It is picked up automatically; nothing else changes.
 

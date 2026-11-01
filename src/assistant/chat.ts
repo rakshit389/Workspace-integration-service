@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { ChatMessage, ChatModel, ToolSpec } from './llm.js';
-import { assistantTools, runTool, type ToolContext } from './tools.js';
+import { toolDefinitions } from './toolDefinitions.js';
+import { runTool, type ToolContext } from './tools.js';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -43,7 +44,7 @@ export const chatBodySchema = {
   },
 } as const;
 
-const localToolSpecs: ToolSpec[] = assistantTools.map((tool) => ({
+const localToolSpecs: ToolSpec[] = toolDefinitions.map((tool) => ({
   type: 'function',
   function: {
     name: tool.name,
