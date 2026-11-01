@@ -6,13 +6,23 @@ All three enterprise systems are mocked and start with the service, so nothing e
 
 ## Run it
 
-Requires **Node.js 20 or later**.
+**With Node.js 20 or later:**
 
 ```bash
 npm install
 npm start        # API on :3000, mocks on :4001-4003
 npm test         # 77 tests, about 3 seconds; no language model needed
 ```
+
+**Or with Docker** (no Node.js needed):
+
+```bash
+cp .env.example .env
+docker build -t workspace-integration-service .
+docker run --rm -p 3000:3000 --env-file .env workspace-integration-service
+```
+
+Both start the API on `http://localhost:3000` with the three mocked systems. See [Docker](#docker) for details.
 
 ## Try it
 
@@ -188,17 +198,40 @@ Add one file to `src/panels/`, for example `documents.panel.ts`, that default-ex
 - **Catalogue:** single variants are read from the mock and cached; search runs on an in-memory read model loaded from the mock's bulk export (`GET /export`) and refreshed every 10 minutes, so searches never call the catalogue. Production keeps the read model in PostgreSQL, fed by the nightly export and the change feed, with full-text search.
 - **Events and proposals:** the event hub, stream tickets, proposals and audit log are in memory. Production uses Redis pub/sub (so any replica can reach a user's stream), Redis for proposals and tickets, and PostgreSQL for the audit log.
 
-## Docker and CI
+## Docker
+
+One image runs the whole service: the API and the three mocked systems, which talk to each other inside the container. Only port 3000 needs publishing.
 
 ```bash
-cp .env.example .env
-docker build -t workspace-integration-service .
+cp .env.example .env                              # once; edit if needed
+docker build -t workspace-integration-service .   # again after any code change
 docker run --rm -p 3000:3000 --env-file .env workspace-integration-service
 ```
 
-Empty values in `.env` use the defaults. For the assistant chat, set `LLM_BASE_URL=http://host.docker.internal:11434/v1` so the container reaches Ollama on the machine running Docker; without it, chat answers `503` and everything else works.
+Stop it with `Ctrl + C`. `--rm` removes the container on exit, so the next run starts from the seed data again (re-sizes are not kept).
 
-`.github/workflows/ci.yml` type-checks, tests and builds on Node 20 and 22, then builds the image.
+To run it in the background:
+
+```bash
+docker run -d --rm --name wis -p 3000:3000 --env-file .env workspace-integration-service
+docker logs -f wis      # follow the logs
+docker stop wis         # stop
+```
+
+**Settings** come from `.env` (see `.env.example`). Empty values use the defaults, and `.env` is kept out of both Git and the image. For the assistant chat, the container must reach a language model:
+
+```bash
+# .env — Ollama running on the machine that runs Docker
+LLM_BASE_URL=http://host.docker.internal:11434/v1
+```
+
+Inside a container, `127.0.0.1` is the container itself; `host.docker.internal` is the machine running Docker. Without a reachable model, chat answers `503` and everything else works.
+
+If port 3000 is taken (for example by `npm start`), stop that first or publish another port: `-p 3001:3000`, then call `http://localhost:3001`.
+
+## CI
+
+`.github/workflows/ci.yml` type-checks, tests and builds on Node 20 and 22, then builds the Docker image.
 
 ## AI tools used
 
