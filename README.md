@@ -23,6 +23,11 @@ npm run start:mcp      # MCP service on :3001, in a second terminal
 
 ```bash
 cp .env.example .env
+```
+
+In `.env`, set `API_URL=http://api:3000` (and, for chat, `LLM_BASE_URL=http://host.docker.internal:11434/v1`; see [Docker](#docker)). Then:
+
+```bash
 docker compose up --build
 ```
 
@@ -30,9 +35,13 @@ docker compose up --build
 
 ## Try it
 
+Start both services first.
+
 **Easiest: Postman.** Import `postman/workspace-integration.postman_collection.json` and run the requests from top to bottom. Login tokens are created automatically.
 
-**Or with curl**, in a second terminal:
+The sizing mock is slow (0.5–3 s) and fails 20% of requests on purpose, as in the brief. So the sizing panel sometimes shows `pending` or `unavailable`; send the request again.
+
+**Or with curl** (needs Node for the token command), in a second terminal:
 
 ```bash
 TOKEN=$(npm run -s token)
@@ -123,13 +132,15 @@ The assistant has five tools. They run **as the user**, so the AI can never see 
 
 The tool names and descriptions are defined once (`src/assistant/toolDefinitions.ts`), so both see the same tools.
 
-**Chat needs a local language model** (free, runs on your machine):
+**Chat needs a local language model** (free, runs on your machine). On macOS:
 
 ```bash
 brew install ollama
 brew services start ollama
 ollama pull qwen2.5:3b
 ```
+
+On other systems, install Ollama from [ollama.com](https://ollama.com), then run `ollama pull qwen2.5:3b`.
 
 Without it, chat answers `503`; everything else still works. The tests use a fake model.
 
